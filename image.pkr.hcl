@@ -77,7 +77,7 @@ build {
       PDK_ROOT        = "/home/ttuser/pdk"
       PDK_VERSION     = "bdc9412b3e468c102d01b7cf6337be06ec6e9c9a"
       KLAYOUT_VERSION = "0.30.3"
-      MAGIC_VERSION   = "8.3.473"
+      MAGIC_VERSION   = "8.3.576"
       NETGEN_VERSION  = "1.5.270"
       OPENLANE_TAG    = "2024.05.09"
       VERILATOR_VERSION = "v5.024"
