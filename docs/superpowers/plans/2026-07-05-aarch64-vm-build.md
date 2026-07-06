@@ -47,7 +47,7 @@
 - arm64 ISO → `ubuntu-22.04.3-live-server-arm64.iso` (200 OK), checksum `sha256:5702372d25111e24d59596de62ae24daef873018cbf63c9dd9ff12292a57aca9`. (Chosen over 22.04.4 because `SHA256SUMS` lacks a hash for the plain 22.04.4 live-server arm64 ISO; 22.04.3 also matches the amd64 build's pin.)
 - UEFI firmware → package `qemu-efi-aarch64`, paths `/usr/share/AAVMF/AAVMF_{CODE,VARS}.fd` (final existence check runs in the CI job).
 - KLayout arm64 `.deb` at 0.30.3 → **404 (absent)**; the arch-aware script uses the `apt` fallback (accepts version drift).
-- FOSSi Nix cache → reachable (`nix-cache-info` returns Priority 30); definitive aarch64-linux binary coverage is the CI gate in Task 8.
+- FOSSi Nix cache → reachable (`nix-cache-info` returns Priority 30). **aarch64-linux coverage confirmed (2026-07-06):** the cache is populated by `fossi-foundation/nix-eda`, whose `flake.nix` lists `aarch64-linux` in `forAllSystems` and whose CI matrix builds `nix_double: aarch64-linux` on `ubuntu-22.04-arm` runners (package compilation needs no KVM). So LibreLane's `nix-shell` should pull prebuilt aarch64-linux tools rather than compiling from source. Final proof is the local arm64 build run.
 - `LIBRELANE_VERSION` → **`3.0.4`** (latest stable release; tags have no `v` prefix).
 
 - [ ] **Step 1: Confirm the arm64 ISO filename still resolves**
