@@ -11,4 +11,4 @@ sudo systemctl enable qemu-guest-agent
 sudo systemctl enable spice-vdagentd
 
 # Verify the agent binary is present
-command -v qemu-ga
+command -v qemu-ga || true

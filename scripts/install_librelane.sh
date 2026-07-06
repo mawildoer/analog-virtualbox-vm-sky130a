@@ -31,7 +31,7 @@ cat > "$HOME/Desktop/librelane.desktop" << 'EOF'
 Type=Application
 Name=LibreLane Shell
 Comment=Open a terminal inside the LibreLane Nix environment
-Exec=gnome-terminal --working-directory=/home/ttuser/librelane -- nix-shell
+Exec=gnome-terminal --working-directory=/home/ttuser/librelane -- bash -lc nix-shell
 Icon=utilities-terminal
 Terminal=false
 Categories=Development;
