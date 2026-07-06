@@ -20,6 +20,8 @@ locals {
   ssh_read_write_timeout = "600s"
   ssh_timeout            = "120m"
   shutdown_command       = "sudo shutdown -h now"
+  # Shared GRUB autoinstall sequence. Reused by the UEFI arm64 qemu source;
+  # its keystroke timing is verified on the arm64 CI build (plan Task 8).
   boot_command = [
     "<wait5>c<wait>",
     "set gfxpayload=keep<enter><wait>",
@@ -87,9 +89,11 @@ source "qemu" "tinytapeout_analog_vm_arm64" {
   ssh_password           = local.ssh_password
   ssh_timeout            = local.ssh_timeout
   ssh_read_write_timeout = local.ssh_read_write_timeout
+  # NOTE: a -machine entry in qemuargs replaces Packer's default -machine wholesale,
+  # so accel=kvm must be included here or KVM acceleration is silently lost.
   qemuargs = [
     ["-cpu", "host"],
-    ["-machine", "virt,gic-version=max"],
+    ["-machine", "virt,gic-version=max,accel=kvm"],
     ["-drive", "if=pflash,format=raw,readonly=on,file=/usr/share/AAVMF/AAVMF_CODE.fd"],
     ["-drive", "if=pflash,format=raw,file=AAVMF_VARS.fd"],
     ["-device", "virtio-gpu-pci"]
