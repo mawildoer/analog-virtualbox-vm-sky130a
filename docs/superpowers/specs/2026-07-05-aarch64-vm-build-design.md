@@ -1,7 +1,32 @@
 # aarch64 VM built alongside the x86-64 VM — Design
 
 **Date:** 2026-07-05
-**Status:** Proposed
+**Status:** Implemented, with a build-venue change (see Addendum)
+
+> ## Addendum (2026-07-06): arm64 build moved from CI to a local Mac build
+>
+> **What changed and why.** The design assumed CI would build the arm64 image on a
+> free `ubuntu-24.04-arm` runner with native KVM. On first CI run, the `build-arm64`
+> job failed immediately at "Enable KVM group perms": **GitHub's free arm64 hosted
+> runners do not expose `/dev/kvm`** (no nested virtualization on arm64 runners; only
+> x86 runners have it). So QEMU could only fall back to slow TCG emulation, which for
+> a full autoinstall + from-source tool builds would likely exceed the 6-hour job cap.
+>
+> **New approach (chosen by the user).** The arm64 qcow2 is now built **locally on an
+> Apple Silicon Mac** using QEMU + Hypervisor.framework (`accel=hvf`, native speed).
+> - `image.pkr.hcl`: the qemu source is parameterized with `var.qemu_accel` (default
+>   `hvf`) and `var.efi_code_path` (default the Homebrew edk2 path), so it works on the
+>   Mac and can still target an arm64-Linux-with-KVM host via `-var` overrides.
+> - `scripts/build_arm64_local.sh`: wrapper that locates the edk2 firmware, prepares
+>   the writable NVRAM (`AAVMF_VARS.fd`), and runs `packer build -only=qemu…`.
+> - CI: the `build-arm64` job and the publish job's arm64 lines were **removed**; CI
+>   again builds only the x86 OVA. A comment in the workflow documents how to restore
+>   the CI job if GitHub ever enables KVM on arm64 runners.
+> - Everything else in this design (the qemu source shape, UEFI/ESP autoinstall,
+>   LibreLane, guest tools, arch-aware KLayout) is unchanged — only the *venue* moved.
+>
+> The sections below describe the original design; read them with the venue change above
+> in mind (CI ARM runner → local Mac HVF build).
 
 ## Goal
 

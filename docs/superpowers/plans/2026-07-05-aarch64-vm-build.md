@@ -12,6 +12,16 @@
 
 **Reference spec:** `docs/superpowers/specs/2026-07-05-aarch64-vm-build-design.md`
 
+> **Addendum (2026-07-06) — arm64 build moved to a local Mac build.** Tasks 1–7 were
+> implemented and reviewed as written. In Task 8, the first CI run proved GitHub's free
+> `ubuntu-24.04-arm` runners have **no `/dev/kvm`**, so the `build-arm64` job can't build
+> with hardware acceleration. Per the user's decision, the arm64 image is now built
+> **locally on an Apple Silicon Mac** (QEMU + Hypervisor.framework). Follow-up changes:
+> the qemu source was parameterized (`var.qemu_accel` default `hvf`, `var.efi_code_path`);
+> `scripts/build_arm64_local.sh` was added; the CI `build-arm64` job + publish arm64 lines
+> were removed (x86 CI unchanged); README updated. The x86 CI build was confirmed to still
+> pass. See the spec's Addendum for the full rationale.
+
 ---
 
 ## File Structure
