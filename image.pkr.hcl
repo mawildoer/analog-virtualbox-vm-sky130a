@@ -4,12 +4,22 @@ packer {
       source  = "github.com/hashicorp/virtualbox"
       version = "~> 1"
     }
+    qemu = {
+      source  = "github.com/hashicorp/qemu"
+      version = "~> 1"
+    }
   }
 }
 
-source "virtualbox-iso" "tinytapeout_analog_vm" {
-  format = "ova"
-  vm_name = "tinytapeout_analog_vm"
+locals {
+  cpus                   = 4
+  memory                 = 8192
+  disk_size              = 32768
+  ssh_username           = "ttuser"
+  ssh_password           = "magic"
+  ssh_read_write_timeout = "600s"
+  ssh_timeout            = "120m"
+  shutdown_command       = "sudo shutdown -h now"
   boot_command = [
     "<wait5>c<wait>",
     "set gfxpayload=keep<enter><wait>",
@@ -21,9 +31,15 @@ source "virtualbox-iso" "tinytapeout_analog_vm" {
     "initrd /casper/initrd<enter><wait>",
     "boot<wait><enter><enter>"
   ]
+}
+
+source "virtualbox-iso" "tinytapeout_analog_vm" {
+  format                 = "ova"
+  vm_name                = "tinytapeout_analog_vm"
+  boot_command           = local.boot_command
   boot_wait              = "1s"
-  cpus                   = 4
-  disk_size              = 32768
+  cpus                   = local.cpus
+  disk_size              = local.disk_size
   guest_os_type          = "Ubuntu_64"
   headless               = true
   http_directory         = "./http"
@@ -31,16 +47,16 @@ source "virtualbox-iso" "tinytapeout_analog_vm" {
   iso_url                = "https://old-releases.ubuntu.com/releases/22.04/ubuntu-22.04.3-live-server-amd64.iso"
   guest_additions_url    = "https://download.virtualbox.org/virtualbox/7.0.14/VBoxGuestAdditions_7.0.14.iso"
   guest_additions_sha256 = "0efbcb9bf4722cb19292ae00eba29587432e918d3b1f70905deb70f7cf78e8ce"
-  memory                 = 8192
+  memory                 = local.memory
   gfx_controller         = "vmsvga"
   gfx_vram_size          = 128
   gfx_accelerate_3d      = true
-  shutdown_command       = "sudo shutdown -h now"
-  ssh_password           = "magic"
+  shutdown_command       = local.shutdown_command
+  ssh_password           = local.ssh_password
   ssh_port               = 22
-  ssh_read_write_timeout = "600s"
-  ssh_timeout            = "120m"
-  ssh_username           = "ttuser"
+  ssh_read_write_timeout = local.ssh_read_write_timeout
+  ssh_timeout            = local.ssh_timeout
+  ssh_username           = local.ssh_username
   vboxmanage = [
     ["modifyvm", "{{ .Name }}", "--cpu-profile", "host"],
   ]
@@ -49,8 +65,42 @@ source "virtualbox-iso" "tinytapeout_analog_vm" {
   vrdp_port_min     = 5900
 }
 
+source "qemu" "tinytapeout_analog_vm_arm64" {
+  vm_name                = "tinytapeout_analog_vm_arm64.qcow2"
+  qemu_binary            = "qemu-system-aarch64"
+  machine_type           = "virt"
+  accelerator            = "kvm"
+  format                 = "qcow2"
+  disk_interface         = "virtio"
+  disk_size              = local.disk_size
+  net_device             = "virtio-net-pci"
+  cpus                   = local.cpus
+  memory                 = local.memory
+  headless               = true
+  http_directory         = "./http-arm64"
+  iso_url                = "https://old-releases.ubuntu.com/releases/22.04/ubuntu-22.04.3-live-server-arm64.iso"
+  iso_checksum           = "sha256:5702372d25111e24d59596de62ae24daef873018cbf63c9dd9ff12292a57aca9"
+  boot_wait              = "5s"
+  boot_command           = local.boot_command
+  shutdown_command       = local.shutdown_command
+  ssh_username           = local.ssh_username
+  ssh_password           = local.ssh_password
+  ssh_timeout            = local.ssh_timeout
+  ssh_read_write_timeout = local.ssh_read_write_timeout
+  qemuargs = [
+    ["-cpu", "host"],
+    ["-machine", "virt,gic-version=max"],
+    ["-drive", "if=pflash,format=raw,readonly=on,file=/usr/share/AAVMF/AAVMF_CODE.fd"],
+    ["-drive", "if=pflash,format=raw,file=AAVMF_VARS.fd"],
+    ["-device", "virtio-gpu-pci"]
+  ]
+}
+
 build {
-  sources = ["source.virtualbox-iso.tinytapeout_analog_vm"]
+  sources = [
+    "source.virtualbox-iso.tinytapeout_analog_vm",
+    "source.qemu.tinytapeout_analog_vm_arm64",
+  ]
 
   provisioner "shell" {
     inline = [
@@ -68,26 +118,24 @@ build {
   }
 
   provisioner "file" {
-    source = "assets/ttwallpaper.png"
+    source      = "assets/ttwallpaper.png"
     destination = "/home/ttuser/Pictures/ttwallpaper.png"
   }
 
   provisioner "shell" {
     env = {
-      PDK_ROOT        = "/home/ttuser/pdk"
-      PDK_VERSION     = "bdc9412b3e468c102d01b7cf6337be06ec6e9c9a"
-      KLAYOUT_VERSION = "0.30.3"
-      MAGIC_VERSION   = "8.3.576"
-      NETGEN_VERSION  = "1.5.270"
-      OPENLANE_TAG    = "2024.05.09"
+      PDK_ROOT          = "/home/ttuser/pdk"
+      PDK_VERSION       = "bdc9412b3e468c102d01b7cf6337be06ec6e9c9a"
+      KLAYOUT_VERSION   = "0.30.3"
+      MAGIC_VERSION     = "8.3.576"
+      NETGEN_VERSION    = "1.5.270"
+      OPENLANE_TAG      = "2024.05.09"
       VERILATOR_VERSION = "v5.024"
-      NGSPICE_VERSION = "44"
-      XSCHEM_VERSION  = "e55c8294c2a89c4a6f45923abd5e20c40e4ffe86"
+      NGSPICE_VERSION   = "44"
+      XSCHEM_VERSION    = "e55c8294c2a89c4a6f45923abd5e20c40e4ffe86"
     }
     scripts = [
-      "scripts/install_virtualbox_tools.sh",
       "scripts/install_pdk.sh",
-      "scripts/install_openlane.sh",
       "scripts/install_verilator.sh",
       "scripts/install_klayout.sh",
       "scripts/install_magic.sh",
@@ -97,6 +145,25 @@ build {
       "scripts/install_gaw.sh",
       "scripts/terminal_icon.sh",
       "scripts/set_wallpaper.sh",
+    ]
+  }
+
+  provisioner "shell" {
+    only = ["virtualbox-iso.tinytapeout_analog_vm"]
+    scripts = [
+      "scripts/install_virtualbox_tools.sh",
+      "scripts/install_openlane.sh",
+    ]
+  }
+
+  provisioner "shell" {
+    only = ["qemu.tinytapeout_analog_vm_arm64"]
+    env = {
+      LIBRELANE_VERSION = "3.0.4"
+    }
+    scripts = [
+      "scripts/install_qemu_tools.sh",
+      "scripts/install_librelane.sh",
     ]
   }
 }
