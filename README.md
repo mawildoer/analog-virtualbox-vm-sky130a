@@ -21,10 +21,24 @@ The VM is based on Ubuntu 22.04 and includes the following tools:
 You can download the latest version of the VM from the following link:
 
 - [VirtualBox Machine - tinytapeout_analog_vm.ova](https://sky130-vm.tinytapeout.com/tinytapeout_analog_vm.ova)
+- **Apple Silicon (arm64) / UTM:** [tinytapeout_analog_vm_arm64.qcow2](https://sky130-vm.tinytapeout.com/tinytapeout_analog_vm_arm64.qcow2)
 
 The VM is about 5 GB in size and requires about 20 GB of disk space to import. You can import the OVA file into [VirtualBox](https://www.virtualbox.org/wiki/Downloads) by going to `File -> Import Appliance` and selecting the OVA file.
 
 You can also import the OVA file into [VMware Workstation Player](https://www.vmware.com/products/workstation-player.html), by going to `Player -> File -> Open...` and selecting the OVA file. When importing into VMware, you will see a warning about "virtual hardware compliance". Click "Retry" to continue.
+
+### Running on Apple Silicon Macs (UTM)
+
+On an Apple Silicon Mac, use the arm64 `qcow2` image with [UTM](https://mac.getutm.app/) (free):
+
+1. Download `tinytapeout_analog_vm_arm64.qcow2`.
+2. In UTM: **Create a New Virtual Machine → Virtualize → Linux**.
+3. Skip the boot ISO. Under **Drives**, remove the default drive and **Import** the downloaded `.qcow2`.
+4. Set the VM to at least 4 CPUs and 8 GB RAM, then start it.
+
+The image runs natively on Apple Silicon (no emulation). Log in with username `ttuser`
+and password `magic`. The digital flow uses [LibreLane](https://librelane.readthedocs.io/)
+(open a "LibreLane Shell" from the desktop) instead of the OpenLane Docker image used on x86.
 
 ### Verifying the download
 
