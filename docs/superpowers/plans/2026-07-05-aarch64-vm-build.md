@@ -33,6 +33,13 @@
 
 **No files changed.** Record each result inline in the relevant later task (or in commit messages). These were deliberately deferred by the spec because they depend on external state.
 
+**RESOLVED 2026-07-05 (controller):**
+- arm64 ISO → `ubuntu-22.04.3-live-server-arm64.iso` (200 OK), checksum `sha256:5702372d25111e24d59596de62ae24daef873018cbf63c9dd9ff12292a57aca9`. (Chosen over 22.04.4 because `SHA256SUMS` lacks a hash for the plain 22.04.4 live-server arm64 ISO; 22.04.3 also matches the amd64 build's pin.)
+- UEFI firmware → package `qemu-efi-aarch64`, paths `/usr/share/AAVMF/AAVMF_{CODE,VARS}.fd` (final existence check runs in the CI job).
+- KLayout arm64 `.deb` at 0.30.3 → **404 (absent)**; the arch-aware script uses the `apt` fallback (accepts version drift).
+- FOSSi Nix cache → reachable (`nix-cache-info` returns Priority 30); definitive aarch64-linux binary coverage is the CI gate in Task 8.
+- `LIBRELANE_VERSION` → **`3.0.4`** (latest stable release; tags have no `v` prefix).
+
 - [ ] **Step 1: Confirm the arm64 ISO filename still resolves**
 
 Run:
@@ -162,8 +169,8 @@ source "qemu" "tinytapeout_analog_vm_arm64" {
   memory           = local.memory
   headless         = true
   http_directory   = "./http-arm64"
-  iso_url          = "https://old-releases.ubuntu.com/releases/22.04/ubuntu-22.04.4-live-server-arm64.iso"
-  iso_checksum     = "file:https://old-releases.ubuntu.com/releases/22.04/SHA256SUMS"
+  iso_url          = "https://old-releases.ubuntu.com/releases/22.04/ubuntu-22.04.3-live-server-arm64.iso"
+  iso_checksum     = "sha256:5702372d25111e24d59596de62ae24daef873018cbf63c9dd9ff12292a57aca9"
   boot_wait        = "5s"
   boot_command     = local.boot_command
   shutdown_command = local.shutdown_command
@@ -206,7 +213,7 @@ Keep the shared provisioners (the apt `shell`, the two `file` provisioners, and 
       "scripts/set_wallpaper.sh",
     ]
 ```
-Add `LIBRELANE_VERSION = "<tag from Task 0 Step 5>"` to that provisioner's `env` map (alongside the existing version pins).
+Add `LIBRELANE_VERSION = "3.0.4"` to that provisioner's `env` map (alongside the existing version pins).
 
 Then add two gated provisioners at the end of the `build` block:
 ```hcl
@@ -221,7 +228,7 @@ Then add two gated provisioners at the end of the `build` block:
   provisioner "shell" {
     only = ["qemu.tinytapeout_analog_vm_arm64"]
     env = {
-      LIBRELANE_VERSION = "<tag from Task 0 Step 5>"
+      LIBRELANE_VERSION = "3.0.4"
     }
     scripts = [
       "scripts/install_qemu_tools.sh",
