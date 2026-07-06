@@ -1,0 +1,71 @@
+#cloud-config
+autoinstall:
+  version: 1
+  locale: en_US.UTF-8
+  refresh-installer:
+      update: yes
+  keyboard:
+      layout: us
+  network:
+      network:
+          version: 2
+          ethernets:
+              eth0:
+                 dhcp4: yes
+  apt:
+      primary:
+          - arches: [default]
+            uri: http://ports.ubuntu.com/ubuntu-ports/
+  storage:
+      swap:
+          size: 0
+      config:
+          - { type: disk, id: disk-0, ptable: gpt, wipe: superblock-recursive, grub_device: true }
+          - { type: partition, id: partition-0, number: 1, device: disk-0, size: 512M, wipe: superblock, flag: boot, grub_device: true }
+          - { type: partition, id: partition-1, number: 2, device: disk-0, size: 400M, wipe: superblock }
+          - { type: partition, id: partition-2, number: 3, device: disk-0, size: 4096M, wipe: superblock, flag: swap }
+          - { type: partition, id: partition-3, number: 4, device: disk-0, size: -1, wipe: superblock }
+          - { type: format, id: format-efi, volume: partition-0, fstype: fat32 }
+          - { type: format, id: format-boot, volume: partition-1, fstype: ext4 }
+          - { type: format, id: format-swap, volume: partition-2, fstype: swap }
+          - { type: format, id: format-root, volume: partition-3, fstype: ext4 }
+          - { type: mount, id: mount-efi, device: format-efi, path: /boot/efi }
+          - { type: mount, id: mount-boot, device: format-boot, path: /boot }
+          - { type: mount, id: mount-swap, device: format-swap, path: none }
+          - { type: mount, id: mount-root, device: format-root, path: / }
+  identity:
+      realname: 'Tiny Tapeout User'
+      username: ttuser
+      password: '$6$R0qxzPSbPU5Ynr$Gq2DzboPGHyQw8BmzjakviAK0fvdRS6c6V9WGmIqA5pI/bCWX782kHqGZcJs6vIbLtgVUlxLPH9zmW9eXpqej1'
+      hostname: ubuntu-desktop
+  ssh:
+      install-server: yes
+      authorized-keys: []
+      allow-pw: yes
+  packages:
+      - ca-certificates
+      - open-vm-tools
+      - openssh-server
+      - net-tools
+      - curl
+      - sudo
+      - software-properties-common
+      - apt-transport-https
+      - lsb-release
+  early-commands:
+    - systemctl stop ssh.service
+    - systemctl stop ssh.socket
+  late-commands:
+      - echo 'ttuser ALL=(ALL) NOPASSWD:ALL' > /target/etc/sudoers.d/ttuser
+      - |
+        cat > /target/etc/systemd/network/20-dhcp.network << EOF
+        [Match]
+        Name=enp*
+
+        [Network]
+        DHCP=ipv4
+        EOF
+      - |
+        curtin in-target --target=/target -- /bin/bash -c ' \
+            exit 0 \
+        '
