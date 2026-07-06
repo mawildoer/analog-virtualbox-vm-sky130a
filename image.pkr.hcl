@@ -11,6 +11,23 @@ packer {
   }
 }
 
+# --- aarch64 build tuning ---
+# The aarch64 image is built LOCALLY on an Apple Silicon Mac using QEMU's
+# Hypervisor.framework (accel=hvf), because GitHub's free arm64 hosted runners
+# do NOT provide /dev/kvm (no nested virtualization on arm64 runners). Use the
+# scripts/build_arm64_local.sh wrapper, which sets these for your machine.
+# To build on an arm64 Linux host that has KVM instead, override:
+#   -var 'qemu_accel=kvm' -var 'efi_code_path=/usr/share/AAVMF/AAVMF_CODE.fd'
+variable "qemu_accel" {
+  type    = string
+  default = "hvf"
+}
+
+variable "efi_code_path" {
+  type    = string
+  default = "/opt/homebrew/share/qemu/edk2-aarch64-code.fd"
+}
+
 locals {
   cpus                   = 4
   memory                 = 8192
@@ -21,7 +38,7 @@ locals {
   ssh_timeout            = "120m"
   shutdown_command       = "sudo shutdown -h now"
   # Shared GRUB autoinstall sequence. Reused by the UEFI arm64 qemu source;
-  # its keystroke timing is verified on the arm64 CI build (plan Task 8).
+  # its keystroke timing is verified by the local arm64 build (build_arm64_local.sh).
   boot_command = [
     "<wait5>c<wait>",
     "set gfxpayload=keep<enter><wait>",
@@ -71,7 +88,7 @@ source "qemu" "tinytapeout_analog_vm_arm64" {
   vm_name                = "tinytapeout_analog_vm_arm64.qcow2"
   qemu_binary            = "qemu-system-aarch64"
   machine_type           = "virt"
-  accelerator            = "kvm"
+  accelerator            = var.qemu_accel
   format                 = "qcow2"
   disk_interface         = "virtio"
   disk_size              = local.disk_size
@@ -90,11 +107,13 @@ source "qemu" "tinytapeout_analog_vm_arm64" {
   ssh_timeout            = local.ssh_timeout
   ssh_read_write_timeout = local.ssh_read_write_timeout
   # NOTE: a -machine entry in qemuargs replaces Packer's default -machine wholesale,
-  # so accel=kvm must be included here or KVM acceleration is silently lost.
+  # so the accelerator (var.qemu_accel, default hvf) must be repeated here or it is
+  # silently lost. AAVMF_VARS.fd is a writable copy of the edk2 vars template that
+  # scripts/build_arm64_local.sh places in the working directory before the build.
   qemuargs = [
     ["-cpu", "host"],
-    ["-machine", "virt,gic-version=max,accel=kvm"],
-    ["-drive", "if=pflash,format=raw,readonly=on,file=/usr/share/AAVMF/AAVMF_CODE.fd"],
+    ["-machine", "virt,gic-version=max,accel=${var.qemu_accel}"],
+    ["-drive", "if=pflash,format=raw,readonly=on,file=${var.efi_code_path}"],
     ["-drive", "if=pflash,format=raw,file=AAVMF_VARS.fd"],
     ["-device", "virtio-gpu-pci"]
   ]

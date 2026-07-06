@@ -20,8 +20,8 @@ The VM is based on Ubuntu 22.04 and includes the following tools:
 
 You can download the latest version of the VM from the following link:
 
-- [VirtualBox Machine - tinytapeout_analog_vm.ova](https://sky130-vm.tinytapeout.com/tinytapeout_analog_vm.ova)
-- **Apple Silicon (arm64) / UTM:** [tinytapeout_analog_vm_arm64.qcow2](https://sky130-vm.tinytapeout.com/tinytapeout_analog_vm_arm64.qcow2)
+- [VirtualBox Machine - tinytapeout_analog_vm.ova](https://sky130-vm.tinytapeout.com/tinytapeout_analog_vm.ova) (x86-64)
+- **Apple Silicon (arm64) / UTM:** built locally — see [Running on Apple Silicon Macs](#running-on-apple-silicon-macs-utm) below.
 
 The VM is about 5 GB in size and requires about 20 GB of disk space to import. You can import the OVA file into [VirtualBox](https://www.virtualbox.org/wiki/Downloads) by going to `File -> Import Appliance` and selecting the OVA file.
 
@@ -29,16 +29,29 @@ You can also import the OVA file into [VMware Workstation Player](https://www.vm
 
 ### Running on Apple Silicon Macs (UTM)
 
-On an Apple Silicon Mac, use the arm64 `qcow2` image with [UTM](https://mac.getutm.app/) (free):
+On an Apple Silicon Mac you run the **arm64** image with [UTM](https://mac.getutm.app/) (free).
+The arm64 image is **built locally** rather than downloaded: GitHub's free arm64 CI
+runners have no hardware virtualization (`/dev/kvm`), so it can't be built in CI. Building
+it on your Mac uses QEMU's Hypervisor.framework, which is native speed (no emulation).
 
-1. Download `tinytapeout_analog_vm_arm64.qcow2`.
-2. In UTM: **Create a New Virtual Machine → Virtualize → Linux**.
-3. Skip the boot ISO. Under **Drives**, remove the default drive and **Import** the downloaded `.qcow2`.
-4. Set the VM to at least 4 CPUs and 8 GB RAM, then start it.
+**1. Build the image** (one time, ~30–60 min; downloads a ~2 GB Ubuntu ISO):
 
-The image runs natively on Apple Silicon (no emulation). Log in with username `ttuser`
-and password `magic`. The digital flow uses [LibreLane](https://librelane.readthedocs.io/)
-(open a "LibreLane Shell" from the desktop) instead of the OpenLane Docker image used on x86.
+```bash
+brew install qemu packer
+scripts/build_arm64_local.sh
+```
+
+This produces `output-tinytapeout_analog_vm_arm64/tinytapeout_analog_vm_arm64.qcow2`.
+
+**2. Import into UTM:**
+
+1. In UTM: **Create a New Virtual Machine → Virtualize → Linux**.
+2. Skip the boot ISO. Under **Drives**, remove the default drive and **Import** the `.qcow2` from step 1.
+3. Set the VM to at least 4 CPUs and 8 GB RAM, then start it.
+
+Log in with username `ttuser` and password `magic`. The digital flow uses
+[LibreLane](https://librelane.readthedocs.io/) (open a "LibreLane Shell" from the desktop)
+instead of the OpenLane Docker image used on x86.
 
 ### Verifying the download
 
@@ -66,14 +79,27 @@ In case of issues with the graphics (e.g. texts do not appear inside Xschem), tr
 
 ## Building the VM locally
 
-To build the VM locally, you need to have [Packer](https://www.packer.io/) and [VirtualBox](https://www.virtualbox.org/) installed. Then, run the following command:
+### x86-64 (VirtualBox OVA)
+
+To build the x86-64 VM locally, you need to have [Packer](https://www.packer.io/) and [VirtualBox](https://www.virtualbox.org/) installed. Then, run the following command:
 
 ```bash
 packer init image.pkr.hcl
-packer build image.pkr.hcl
+packer build -only=virtualbox-iso.tinytapeout_analog_vm image.pkr.hcl
 ```
 
-Building the VM takes about 30 minutes, depending on your internet connection and hardware. The resulting OVA file will be in the `outputoutput-tinytapeout_analog_vm` directory.
+Building the VM takes about 30 minutes, depending on your internet connection and hardware. The resulting OVA file will be in the `output-tinytapeout_analog_vm` directory.
+
+### arm64 (Apple Silicon, qcow2 for UTM)
+
+The arm64 image is built on an Apple Silicon Mac using QEMU + Hypervisor.framework. It is **not** built in CI because GitHub's free arm64 runners lack `/dev/kvm`. Run:
+
+```bash
+brew install qemu packer
+scripts/build_arm64_local.sh
+```
+
+The wrapper locates the edk2 UEFI firmware, prepares a writable NVRAM file, and runs `packer build -only=qemu.tinytapeout_analog_vm_arm64`. The result is `output-tinytapeout_analog_vm_arm64/tinytapeout_analog_vm_arm64.qcow2`. (On an arm64 Linux host with KVM you can instead run Packer directly with `-var qemu_accel=kvm -var efi_code_path=/usr/share/AAVMF/AAVMF_CODE.fd`.)
 
 ## Customizing the VM
 
