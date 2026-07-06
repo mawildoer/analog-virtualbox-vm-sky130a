@@ -56,7 +56,7 @@ jobs:
           cat vminfo.json
 
       - name: Build VM
-        run: 'packer build ./image.pkr.hcl'
+        run: 'packer build -only=virtualbox-iso.tinytapeout_analog_vm ./image.pkr.hcl'
 
       - name: Copy VM info to output directory
         run: 'cp vminfo.json output-tinytapeout_analog_vm/tinytapeout_analog_vm.ova.json'
@@ -69,10 +69,72 @@ jobs:
             output-tinytapeout_analog_vm/tinytapeout_analog_vm.ova
             output-tinytapeout_analog_vm/tinytapeout_analog_vm.ova.json
 
+  build-arm64:
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Enable KVM group perms
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Free Disk Space (Ubuntu)
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: false
+
+      - name: Install QEMU and UEFI firmware
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qemu-system-arm qemu-utils qemu-efi-aarch64
+          # Writable UEFI vars copy in the workspace (referenced by qemuargs in image.pkr.hcl)
+          cp /usr/share/AAVMF/AAVMF_VARS.fd ./AAVMF_VARS.fd
+
+      - name: Setup `packer`
+        uses: hashicorp/setup-packer@main
+        env:
+          PACKER_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure packer
+        run: 'packer init ./image.pkr.hcl'
+
+      - name: 'Write vminfo.json'
+        run: |
+          cat > vminfo.json << EOF
+          {
+            "repo": "${{ github.server_url }}/${{ github.repository }}",
+            "commit": "${{ github.sha }}",
+            "tag": "${{ github.ref }}",
+            "arch": "arm64",
+            "build_time": "$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          }
+          EOF
+          cat vminfo.json
+
+      - name: Build VM
+        run: 'packer build -only=qemu.tinytapeout_analog_vm_arm64 ./image.pkr.hcl'
+
+      - name: Locate and compress qcow2
+        run: |
+          SRC=$(find output-* -name '*.qcow2' | head -1)
+          qemu-img convert -O qcow2 -c "$SRC" tinytapeout_analog_vm_arm64.qcow2
+          cp vminfo.json tinytapeout_analog_vm_arm64.qcow2.json
+
+      - name: Upload VM image
+        uses: actions/upload-artifact@v4
+        with:
+          name: tt_analog_qemu_qcow2
+          path: |
+            tinytapeout_analog_vm_arm64.qcow2
+            tinytapeout_analog_vm_arm64.qcow2.json
+
   publish:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
-    needs: build
+    needs: [build, build-arm64]
     steps:
       - name: Download VM image
         uses: actions/download-artifact@v4
@@ -80,9 +142,19 @@ jobs:
           name: tt_analog_virtualbox_ova
           path: artifacts
 
+      - name: Download arm64 VM image
+        uses: actions/download-artifact@v4
+        with:
+          name: tt_analog_qemu_qcow2
+          path: artifacts
+
       - name: Generate SHA256 hash
         working-directory: artifacts
         run: sha256sum tinytapeout_analog_vm.ova > tinytapeout_analog_vm.ova.sha256
+
+      - name: Generate arm64 SHA256 hash
+        working-directory: artifacts
+        run: sha256sum tinytapeout_analog_vm_arm64.qcow2 > tinytapeout_analog_vm_arm64.qcow2.sha256
 
       - name: Set up S3cmd cli tool
         uses: s3-actions/s3cmd@v1.6.1
@@ -95,6 +167,9 @@ jobs:
       - name: Upload VM image to R2
         working-directory: artifacts
         run: |
-          s3cmd put --multipart-chunk-size-mb=5000 --acl-public tinytapeout_analog_vm.ova tinytapeout_analog_vm.ova.json tinytapeout_analog_vm.ova.sha256 "s3://$BUCKET_NAME/"
+          s3cmd put --multipart-chunk-size-mb=5000 --acl-public \
+            tinytapeout_analog_vm.ova tinytapeout_analog_vm.ova.json tinytapeout_analog_vm.ova.sha256 \
+            tinytapeout_analog_vm_arm64.qcow2 tinytapeout_analog_vm_arm64.qcow2.json tinytapeout_analog_vm_arm64.qcow2.sha256 \
+            "s3://$BUCKET_NAME/"
         env:
           BUCKET_NAME: ${{ vars.R2_BUCKET_NAME }}
